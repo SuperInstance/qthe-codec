@@ -60,14 +60,44 @@ def _rle_decode(b: bytes) -> list[int]:
 
 
 def compile(stream: list[int]) -> bytes:
-    """Compile a QTHE byte stream -> bytes. Returns the compact verifiable form."""
+    """Compile a QTHE byte stream -> bytes. Returns the compact verifiable form.
+
+    KEY FIX (found by D17): the wire timbre (b>>6) is SCRAMBLED by the Latin
+    square — that scrambling is what HIDES the tone from context-free readers,
+    so RLE on the wire can never compress it (1 semantic run -> ~209 wire runs).
+    To compress, we must DECODE the momentum first (using the data plane as
+    context), RLE the DECODED momentum (which has the real runs), and pack the
+    6-bit data tokens 4-per-3-bytes. The receiver re-encodes wire timbre from
+    (momentum, data) on decompile."""
     data = [b & 0x3F for b in stream]
     timbre = [b >> 6 for b in stream]
-    rle = _rle_encode(timbre)
-    body = struct.pack(">I", len(data)) + bytes(data) + \
+    momentum = [(timbre[i] - data[i] % 4) % 4 for i in range(len(stream))]  # decode
+    rle = _rle_encode(momentum)
+    packed_data = _pack6(data)
+    body = struct.pack(">I", len(data)) + packed_data + \
         struct.pack(">I", len(rle)) + rle
     crc = zlib.crc32(MAGIC + bytes([8]) + body) & 0xFFFFFFFF
     return MAGIC + bytes([8]) + body + struct.pack(">I", crc)
+
+
+def _pack6(tokens: list[int]) -> bytes:
+    """Pack 6-bit tokens 4-per-3-bytes (24 bits -> 3 bytes)."""
+    out = bytearray()
+    for i in range(0, len(tokens), 4):
+        chunk = tokens[i:i + 4]
+        while len(chunk) < 4:
+            chunk.append(0)
+        v = (chunk[0] << 18) | (chunk[1] << 12) | (chunk[2] << 6) | chunk[3]
+        out += v.to_bytes(3, "big")
+    return bytes(out)
+
+
+def _unpack6(b: bytes, n: int) -> list[int]:
+    out = []
+    for i in range(0, len(b), 3):
+        v = int.from_bytes(b[i:i + 3], "big")
+        out += [(v >> 18) & 0x3F, (v >> 12) & 0x3F, (v >> 6) & 0x3F, v & 0x3F]
+    return out[:n]
 
 
 def decompile(compiled: bytes) -> list[int]:
@@ -84,32 +114,39 @@ def decompile(compiled: bytes) -> list[int]:
     pos = 5
     n_data = struct.unpack(">I", compiled[pos:pos + 4])[0]
     pos += 4
-    data = list(compiled[pos:pos + n_data])
-    pos += n_data
+    packed_len = ((n_data + 3) // 4) * 3
+    data = _unpack6(compiled[pos:pos + packed_len], n_data)
+    pos += packed_len
     n_rle = struct.unpack(">I", compiled[pos:pos + 4])[0]
     pos += 4
     rle = compiled[pos:pos + n_rle]
-    timbre = _rle_decode(rle)
-    assert len(timbre) == len(data), "RLE/data length mismatch after decompile"
-    return [(timbre[i] << 6) | data[i] for i in range(len(data))]
+    momentum = _rle_decode(rle)
+    assert len(momentum) == len(data), "RLE/data length mismatch after decompile"
+    # re-encode wire timbre from (momentum, data) via the Latin square
+    return [(((momentum[i] + data[i] % 4) % 4) << 6) | data[i] for i in range(len(data))]
 
 
 def compression_ratio(stream: list[int]) -> dict:
-    """Report the raw vs compiled size, plus the two-plane breakdown. The
-    interesting number is how much the TIMBRE plane compresses (tone runs)."""
+    """Report the raw vs compiled size. The honest timbre number is the
+    DECODED-momentum RLE (what the compiler actually stores) — the wire timbre
+    RLE would be ~0.72 (the Latin square scrambles it; that scrambling IS the
+    invisibility)."""
     compiled = compile(stream)
     n = len(stream)
-    data = bytes([b & 0x3F for b in stream])
+    data = [b & 0x3F for b in stream]
     timbre = [b >> 6 for b in stream]
-    rle = _rle_encode(timbre)
+    momentum = [(timbre[i] - data[i] % 4) % 4 for i in range(n)]
+    rle_momentum = _rle_encode(momentum)
+    rle_wire = _rle_encode(timbre)
     return {
         "raw_bytes": n,
         "compiled_bytes": len(compiled),
         "ratio": round(len(compiled) / n, 4),
-        "data_plane_bytes": len(data),
-        "timbre_raw_bytes": n,
-        "timbre_rle_bytes": len(rle),
-        "timbre_compression": round(len(rle) / n, 4),
+        "data_plane_packed_bytes": len(_pack6(data)),
+        "momentum_rle_bytes": len(rle_momentum),
+        "momentum_compression": round(len(rle_momentum) / n, 4),
+        "wire_timbre_rle_bytes": len(rle_wire),
+        "wire_compression": round(len(rle_wire) / n, 4),
     }
 
 
