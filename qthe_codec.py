@@ -154,6 +154,58 @@ def timbre_view(stream: list[int]) -> list[int]:
     return [b >> 6 for b in stream]
 
 
+# ── the 7th bit: the abstain state as an ESCAPE hatch (Casey, 2026-09-27) ─
+# The primitive gives 2 timbre bits = 4 states. If you need a 7th bit for the
+# NEXT set of less-common characters, you spend the 4th state: when a cell is
+# in ABSTAIN (timbre=3, "no hidden information"), its 6 data bits stop being a
+# base symbol and instead index a SECOND 64-symbol charset. That is the extra
+# bit — and you "lose that information" (the tone on that cell), which is fine
+# because rare characters are special/objective anyway ($, #, %, =, uppercase
+# letters, em-dashes). You trade tone for alphabet, one cell at a time.
+RARE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%^&*_+=~|<>/?;:{}[]\\`\""
+n_rare = len(RARE)
+assert n_rare <= 64, f"RARE has {n_rare} symbols; must fit 6 bits"
+RARE_TO_IDX = {c: i for i, c in enumerate(RARE)}
+IDX_TO_RARE = {i: c for i, c in enumerate(RARE)}
+
+
+def data_encode_full(text: str) -> list[tuple[int, int]]:
+    """Encode text to (data, timbre-marker) pairs. A character in the base
+    LOW set -> (base_index, 0). A character only in RARE -> (rare_index, 3)
+    where 3 = abstain/escape. This is the 7-bit extension: rare chars ride in
+    the data plane of an abstain cell, buying 64 more symbols for the price of
+    that cell's tone."""
+    out = []
+    for ch in text:
+        if ch in SYM_TO_IDX:
+            out.append((SYM_TO_IDX[ch], 0))
+        elif ch in RARE_TO_IDX:
+            out.append((RARE_TO_IDX[ch], 3))
+        else:
+            # outside both: SHIFT-escape in the base plane
+            out.append((SHIFT, 0))
+            out.append((ord(ch) & 0x3F, 0))
+    return out
+
+
+def data_decode_full(cells: list[tuple[int, int]]) -> str:
+    out = []
+    i = 0
+    while i < len(cells):
+        data, mark = cells[i]
+        if mark == 3:
+            out.append(IDX_TO_RARE.get(data, "?"))
+        elif data == SHIFT:
+            i += 1
+            out.append(chr(cells[i][0]))
+        elif data == EOS:
+            break
+        else:
+            out.append(IDX_TO_SYM.get(data, "?"))
+        i += 1
+    return "".join(out)
+
+
 # ── self-test (runs when the module is executed directly) ─────────────────
 if __name__ == "__main__":
     text = "I love you"
