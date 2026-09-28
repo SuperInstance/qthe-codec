@@ -7,7 +7,16 @@ rides in them for free — invisible to plaintext readers and to context-free
 readers, recoverable only by a contextual (Latin-square) decoder.
 
 This repo is the **documentation with working examples** for that channel,
-organized as four stages:
+organized as four stages — **all four now have a working reference module**:
+
+| stage | module | status |
+|---|---|---|
+| encoder | `qthe_codec.py` | ✅ roundtrip green, 7-bit extension |
+| compiler | `qthe_compiler.py` | ✅ pack+RLE+checksum, corruption-detecting |
+| embedder | `qthe_embedder.py` | ✅ tone→vector, deterministic, separable |
+| transformer | `qthe_transformer.py` | ✅ condense/spatialize/project |
+
+*(the four stages were:)*
 
 1. **encoder** — map human tone (sarcasm, joy, anger, doubt, …) + text → a
    stream of QTHE bytes (6-bit data + 2-bit timbre).
