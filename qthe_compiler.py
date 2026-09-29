@@ -180,6 +180,6 @@ if __name__ == "__main__":
     r = compression_ratio(stream)
     print(f"raw {r['raw_bytes']} -> compiled {r['compiled_bytes']} bytes "
           f"(ratio {r['ratio']})")
-    print(f"timbre plane: {r['timbre_raw_bytes']} raw -> "
-          f"{r['timbre_rle_bytes']} rle ({r['timbre_compression']})")
+    print(f"timbre plane: momentum-RLE {r['momentum_compression']} vs "
+          f"wire-timbre-RLE {r['wire_compression']} (scrambling tax visible)")
     print("OK — compiler roundtrips and detects corruption.")
