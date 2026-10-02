@@ -1,0 +1,78 @@
+{
+  "easy": [
+    {
+      "answer": "furious",
+      "options": [
+        "furious",
+        "wink",
+        "friendly",
+        "flat-facts"
+      ],
+      "image": "tone_12_8201.png"
+    },
+    {
+      "answer": "wink",
+      "options": [
+        "furious",
+        "wink",
+        "friendly",
+        "flat-facts"
+      ],
+      "image": "tone_12_7267.png"
+    },
+    {
+      "answer": "friendly",
+      "options": [
+        "furious",
+        "wink",
+        "friendly",
+        "flat-facts"
+      ],
+      "image": "tone_12_1022.png"
+    },
+    {
+      "answer": "flat-facts",
+      "options": [
+        "furious",
+        "wink",
+        "friendly",
+        "flat-facts"
+      ],
+      "image": "tone_12_0560.png"
+    }
+  ],
+  "hard": [
+    {
+      "answer": "coy",
+      "options": [
+        "coy",
+        "wink"
+      ],
+      "image": "tone_12_1104.png"
+    },
+    {
+      "answer": "awe",
+      "options": [
+        "awe",
+        "wink"
+      ],
+      "image": "tone_12_8270.png"
+    },
+    {
+      "answer": "dread",
+      "options": [
+        "dread",
+        "grief"
+      ],
+      "image": "tone_12_6472.png"
+    },
+    {
+      "answer": "thinks-no",
+      "options": [
+        "thinks-no",
+        "deletion"
+      ],
+      "image": "tone_12_0518.png"
+    }
+  ]
+}
